@@ -1,0 +1,120 @@
+---
+title: "HW2-DATA 627"
+author: "Homayoon Fotros"
+output: pdf_document
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(rio)
+library(tidyverse)
+library(stargazer)
+```
+
+```{r Loading Data}
+KD_dat <- import('KentuckyDerby.csv')
+```
+
+
+## Part (a)
+**Assessment of a non-linear relationship between Speed and Year**
+
+
+In Homework-1, I applied a regression model with Speed and Year having a quadratic relationship. Here, I first evaluate the extent to which this model is superior to a linear fit by Anova test.
+
+```{r Anova Test}
+
+quad_model <- lm(Speed ~ poly(Year,2, raw=TRUE) + factor(Condition), data = KD_dat)
+
+ln_model <- lm(Speed ~ Year + factor(Condition), data = KD_dat)
+
+anova(quad_model, ln_model)
+
+```
+
+The null hypothesis in this Anova test is that the two models are equally fit. The result shows, however, that the *F*-statistic is 82.3 and the p-value is almost zero, which means that the quadratic model is clearly superior to the other one.
+
+We can also test whether including a cubic and quartic terms would improve the model:
+
+```{r Cubic and Quartic Models, results='asis'}
+options(scipen = 999)
+
+cube_model <- lm(Speed ~ poly(Year, 3, raw = TRUE) + factor(Condition), data = KD_dat)
+
+quart_model <- lm(Speed ~ poly(Year, 4, raw = TRUE) + factor(Condition), data = KD_dat)
+
+stargazer(quad_model, cube_model,quart_model, header = FALSE, type = 'latex',
+          column.labels = c( 'Quadratic', 'Cubic', 'Quartic'), title = 'Regression Results')
+```
+
+Unlike the cubic model, applying a quartic model (fourth-degree polynomial) retains the features' statistical significance. So we might test whether this quartic model is superior to the quadratic model:
+
+```{r 4th vs 2nd degree model}
+anova(quad_model, quart_model)
+```
+
+The *F*-statistic is 4.49 and the p-value is 0.13. This result can indicate that the 4th degree polynomial model has slightly improved the quadratic model. However, we must be cautious about the potential overfitting issue of polynomial models as we increase the degree. It is also important to keep the model's complexity at a reasonable level. For these reasons, it appears that a quadratic equation is a better choice for our model.
+
+We may also test the log transformation of time (Year) and see how it performs compared to our quadratic model:
+
+```{r Log Transformation}
+log_model <- lm(Speed ~ log(Year) + factor(Condition), data = KD_dat)
+# summary(log_model)
+
+anova(log_model, quad_model)
+```
+
+The Anova test shows that the quadratic model provides a better fit to our data.
+
+Finally, we can plot the linear, quadratic, and fourth degree polynomial models to visually inspect their fit onto our data set (The following plots only for the Fast Condition).
+
+```{r}
+
+fit_ln <-ln_model$fitted.values[KD_dat$Condition==1]
+fit_quad <- quad_model$fitted.values[KD_dat$Condition==1]
+fit_quart <- quart_model$fitted.values[KD_dat$Condition==1]
+fit_log <- log_model$fitted.values[KD_dat$Condition==1]
+
+cols <- c("Linear" = "mediumpurple", "Quadratic" = "mediumaquamarine", "Quartic" = "maroon1")
+
+KD_dat %>% 
+  filter(Condition==1) %>% 
+  ggplot() +
+  geom_point(aes(Year,Speed), col='steelblue', alpha=0.5) +
+  geom_line(aes(Year, fit_ln, col='Linear'), size=0.7) +
+  geom_line(aes(Year, fit_quad, col='Quadratic'),size=0.7) +
+  geom_line(aes(Year, fit_quart, col='Quartic'), size = 0.7 ) +
+  scale_color_manual(name = 'Model',  values = cols) +
+  theme_classic()
+
+```
+
+## Part (b & c)
+**Impact of track conditions (Fast vs. Slow)**
+
+The result shows the track condition (Condition) has a significant effect on the winning speed (Speed). Concretely, the coefficient for Condition is `r round(quad_model$coefficient[4],2)`. This means if everything else is equal, changing the track condition from Slow to Fast would increase the Speed by 0.75 mph.
+
+The following plot demonstrates how the model fits differently based on the track condition:
+
+```{r}
+
+KD_dat %>% 
+  ggplot() +
+  geom_point(aes(Year,Speed, col=factor(Condition)), alpha=0.9) +
+  geom_line(aes(Year, quad_model$fitted.values, col=factor(Condition)),size=0.7) +
+  scale_color_manual(name = 'Condition',labels = c('Slow', 'Fast'),
+                     values=c("#999999", "#E69F00")) +
+  theme_classic()
+```
+
+As this plot shows, the Slow condition negatively affects the winning speed.
+
+## Part (d)
+**Prediction and comparison with 2020 and 2021 speeds**
+
+I answered this part in HW1 using the same quadratic model.
+
